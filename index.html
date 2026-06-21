@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CrateCount — Milk Packet Counter</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link
+  href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap"
+  rel="stylesheet"
+>
+
+<style>
+/* =========================================================
+   Design tokens
+   ========================================================= */
+:root {
+  --bg-deep: #0A0E1B;
+  --panel: rgba(19, 25, 46, 0.55);
+  --panel-strong: rgba(13, 18, 36, 0.75);
+
+  --neon-cyan: #36F0FF;
+  --neon-pink: #FF3FB4;
+  --neon-lime: #C6FF4D;
+
+  --ink: #EAEEFC;
+  --muted: #8C96BE;
+  --line: rgba(255, 255, 255, 0.09);
+  --green-ok: #43FFA0;
+  --red-error: #FF3F5F;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --max-width: 1000px;
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* =========================================================
+   Reset & base
+   ========================================================= */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  min-height: 100vh;
+  background-color: var(--bg-deep);
+  background-image:
+    radial-gradient(circle at 14% 20%, rgba(54, 240, 255, 0.20) 0%, rgba(54, 240, 255, 0) 40%),
+    radial-gradient(circle at 86% 14%, rgba(255, 63, 180, 0.18) 0%, rgba(255, 63, 180, 0) 42%),
+    radial-gradient(circle at 78% 82%, rgba(198, 255, 77, 0.12) 0%, rgba(198, 255, 77, 0) 42%),
+    radial-gradient(circle at 10% 88%, rgba(54, 240, 255, 0.14) 0%, rgba(54, 240, 255, 0) 42%),
+    linear-gradient(180deg, #0B0F1F 0%, #070A14 100%);
+  background-attachment: fixed;
+  background-size: cover;
+  animation: drift 30s ease-in-out infinite alternate;
+}
+
+@keyframes drift {
+  0%   { background-position: 0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%; }
+  100% { background-position: 6% 4%, 94% 6%, 94% 94%, 6% 96%, 0% 0%; }
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(transparent 31px, rgba(54, 240, 255, 0.05) 32px),
+    linear-gradient(90deg, transparent 31px, rgba(54, 240, 255, 0.05) 32px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(circle at 50% 30%, rgba(0, 0, 0, 0.9) 0%, transparent 75%);
+  mask-image: radial-gradient(circle at 50% 30%, rgba(0, 0, 0, 0.9) 0%, transparent 75%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body { animation: none; }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.wrap {
+  position: relative;
+  z-index: 1;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+/* =========================================================
+   Header
+   ========================================================= */
+.site-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 48px;
+  flex-wrap: wrap;
+}
+
+.brand { display: flex; align-items: center; gap: 14px; }
+
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 4px;
+  padding: 6px;
+  flex-shrink: 0;
+}
+.brand-mark span { border-radius: 3px; box-shadow: 0 0 8px currentColor; }
+.brand-mark span:nth-child(1) { background: var(--neon-cyan); color: var(--neon-cyan); }
+.brand-mark span:nth-child(2) { background: var(--neon-pink); color: var(--neon-pink); }
+.brand-mark span:nth-child(3) { background: var(--neon-lime); color: var(--neon-lime); }
+.brand-mark span:nth-child(4) { background: var(--neon-pink); color: var(--neon-pink); }
+
+.brand h1 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
+.brand p { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--ink);
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 14px 6px 10px;
+}
+
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #5B6585;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.status-dot.live { background: var(--green-ok); box-shadow: 0 0 10px var(--green-ok); }
+.status-dot.down { background: var(--red-error); box-shadow: 0 0 10px var(--red-error); }
+
+/* =========================================================
+   Hero
+   ========================================================= */
+.hero { margin-bottom: 40px; }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--neon-lime);
+  text-shadow: 0 0 12px rgba(198, 255, 77, 0.5);
+  margin-bottom: 10px;
+}
+
+.hero h2 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  max-width: 14ch;
+  color: var(--ink);
+}
+
+.hero h2 .accent {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 18px rgba(54, 240, 255, 0.55), 0 0 40px rgba(54, 240, 255, 0.25);
+}
+
+.hero p { margin-top: 14px; max-width: 46ch; color: var(--muted); font-size: 1.02rem; line-height: 1.6; }
+
+/* =========================================================
+   Mode tabs
+   ========================================================= */
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px;
+  margin-bottom: 20px;
+}
+.tab {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.tab:hover { color: var(--ink); }
+.tab.active { color: #06121C; background: linear-gradient(135deg, var(--neon-cyan), var(--neon-pink)); }
+.tab:focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: 2px; }
+
+.mode-panel { margin-bottom: 0; }
+
+/* =========================================================
+   Video progress bar
+   ========================================================= */
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 0 18px 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink));
+  box-shadow: 0 0 12px rgba(54, 240, 255, 0.5);
+  transition: width 0.3s ease;
+}
+.progress-label { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); margin: 0 18px 14px; }
+
+/* =========================================================
+   Live webcam stage
+   ========================================================= */
+.live-stage {
+  margin: 18px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #05070D;
+  border: 1px solid var(--line);
+  aspect-ratio: 16 / 9;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.live-stage video, .live-stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.live-placeholder { color: var(--muted); font-size: 0.9rem; font-family: var(--font-mono); text-align: center; padding: 24px; }
+.live-stats { font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink); padding: 0 18px 14px; }
+.live-stats span { color: var(--neon-cyan); }
+
+/* =========================================================
+   Upload card
+   ========================================================= */
+.card {
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px rgba(54, 240, 255, 0.04), 0 8px 40px rgba(54, 240, 255, 0.06);
+}
+
+.dropzone {
+  display: block;
+  border: 2px dashed rgba(140, 150, 190, 0.35);
+  border-radius: var(--radius);
+  margin: 18px;
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+.dropzone:hover, .dropzone.dragover {
+  border-color: var(--neon-cyan);
+  background: rgba(54, 240, 255, 0.05);
+  box-shadow: inset 0 0 30px rgba(54, 240, 255, 0.08);
+}
+.dropzone input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.dropzone:focus-within { outline: 2px solid var(--neon-cyan); outline-offset: 2px; }
+
+.drop-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(54, 240, 255, 0.18), rgba(255, 63, 180, 0.18));
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 24px rgba(54, 240, 255, 0.18);
+}
+.drop-icon svg { width: 26px; height: 26px; }
+
+.dropzone h3 { font-family: var(--font-display); font-size: 1.15rem; margin-bottom: 6px; color: var(--ink); }
+.dropzone p { color: var(--muted); font-size: 0.9rem; }
+
+.dropzone .filename {
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--neon-cyan);
+  background: rgba(54, 240, 255, 0.08);
+  border: 1px solid rgba(54, 240, 255, 0.25);
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 22px 22px;
+  flex-wrap: wrap;
+}
+
+.hint { font-size: 0.8rem; color: var(--muted); }
+
+/* =========================================================
+   Run button
+   ========================================================= */
+button.run {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #06121C;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-pink));
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 13px 28px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 0 24px rgba(54, 240, 255, 0.25);
+}
+button.run:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 32px rgba(54, 240, 255, 0.4), 0 0 32px rgba(255, 63, 180, 0.25);
+}
+button.run:focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: 2px; }
+button.run:disabled { background: rgba(140, 150, 190, 0.18); color: var(--muted); box-shadow: none; cursor: not-allowed; }
+
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(6, 18, 28, 0.25);
+  border-top-color: #06121C;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: none;
+}
+.spinner.active { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* =========================================================
+   Error banner
+   ========================================================= */
+.error-box {
+  margin-top: 20px;
+  background: rgba(255, 63, 95, 0.08);
+  border: 1px solid rgba(255, 63, 95, 0.35);
+  color: #FF8FA3;
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  font-size: 0.9rem;
+}
+.error-box strong { font-family: var(--font-display); color: #FFB3C0; }
+
+/* =========================================================
+   Results
+   ========================================================= */
+.results { margin-top: 36px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; }
+@media (max-width: 760px) { .results { grid-template-columns: 1fr; } }
+
+.result-image {
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(54, 240, 255, 0.04), 0 8px 40px rgba(54, 240, 255, 0.06);
+}
+.result-image .label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding: 14px 18px 0;
+}
+.result-image img { display: block; width: 100%; padding: 14px 18px 18px; box-sizing: border-box; border-radius: var(--radius-sm); }
+
+.tally {
+  background: var(--panel-strong);
+  border: 1px solid rgba(54, 240, 255, 0.25);
+  border-radius: var(--radius);
+  padding: 24px;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 0 0 1px rgba(54, 240, 255, 0.05), 0 0 40px rgba(54, 240, 255, 0.12);
+}
+.tally .label { font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.tally-count { font-family: var(--font-mono); font-size: 4rem; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+.tally-count span { color: var(--neon-cyan); text-shadow: 0 0 20px rgba(54, 240, 255, 0.6), 0 0 50px rgba(54, 240, 255, 0.25); }
+
+.crate-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 4px; }
+.crate-grid .slot {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background 0.25s, border-color 0.25s, box-shadow 0.25s;
+}
+.crate-grid .slot.filled { background: var(--neon-cyan); border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(54, 240, 255, 0.6); }
+
+.tally-footnote { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+/* =========================================================
+   Footer
+   ========================================================= */
+footer {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  font-size: 0.8rem;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+footer code {
+  font-family: var(--font-mono);
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: var(--neon-cyan);
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ===================== Header ===================== -->
+  <header class="site-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <div>
+        <h1>CrateCount</h1>
+        <p>Vision-based packet tally for the line</p>
+      </div>
+    </div>
+
+    <div class="status-pill" id="statusPill" role="status" aria-live="polite">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">checking server…</span>
+    </div>
+  </header>
+
+  <!-- ===================== Hero ===================== -->
+  <section class="hero">
+    <p class="eyebrow">YOLO11n · packet detection</p>
+    <h2>Drop a tray photo or video, get an <span class="accent">exact count</span> back in seconds.</h2>
+    <p>Upload an image or video of a milk packet tray, or run live detection from your webcam. The model detects every packet, draws its boxes, and reports the total.</p>
+  </section>
+
+  <!-- ===================== Mode tabs ===================== -->
+  <div class="tabs" role="tablist" aria-label="Detection mode">
+    <button class="tab active" role="tab" aria-selected="true" data-mode="image" type="button">Image</button>
+    <button class="tab" role="tab" aria-selected="false" data-mode="video" type="button">Video</button>
+    <button class="tab" role="tab" aria-selected="false" data-mode="live" type="button">Live</button>
+  </div>
+
+  <!-- ===================== Image mode ===================== -->
+  <section class="card mode-panel" id="panel-image" aria-labelledby="uploadHeading">
+    <h2 id="uploadHeading" class="visually-hidden">Upload a tray image</h2>
+
+    <label class="dropzone" id="dropzone" for="fileInput">
+      <input type="file" id="fileInput" accept="image/*" aria-describedby="dropHint">
+      <div class="drop-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 16V4M12 4L7 9M12 4L17 9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 16V18C4 19.1046 4.89543 20 6 20H18C19.1046 20 20 19.1046 20 18V16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h3>Drag a tray image here, or click to browse</h3>
+      <p id="dropHint">JPG or PNG — works best with a top-down view of the tray</p>
+      <div class="filename" id="filename" hidden></div>
+    </label>
+
+    <div class="card-footer">
+      <span class="hint">Counting runs on your local model server</span>
+      <button class="run" id="runBtn" type="button" disabled>
+        <span class="spinner" id="spinner" aria-hidden="true"></span>
+        <span id="runLabel">Count packets</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===================== Video mode ===================== -->
+  <section class="card mode-panel" id="panel-video" hidden aria-labelledby="videoHeading">
+    <h2 id="videoHeading" class="visually-hidden">Upload a tray video</h2>
+
+    <label class="dropzone" id="videoDropzone" for="videoInput">
+      <input type="file" id="videoInput" accept="video/*" aria-describedby="videoDropHint">
+      <div class="drop-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 16V4M12 4L7 9M12 4L17 9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 16V18C4 19.1046 4.89543 20 6 20H18C19.1046 20 20 19.1046 20 18V16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h3>Drag a tray video here, or click to browse</h3>
+      <p id="videoDropHint">MP4, MOV, or WEBM — under 200MB</p>
+      <div class="filename" id="videoFilename" hidden></div>
+    </label>
+
+    <div class="progress-track" id="videoProgressTrack" hidden>
+      <div class="progress-fill" id="videoProgressFill"></div>
+    </div>
+    <p class="progress-label" id="videoProgressLabel" hidden></p>
+
+    <div class="card-footer">
+      <span class="hint">Samples ~5 frames per second of footage</span>
+      <button class="run" id="videoRunBtn" type="button" disabled>
+        <span class="spinner" id="videoSpinner" aria-hidden="true"></span>
+        <span id="videoRunLabel">Process video</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===================== Live mode ===================== -->
+  <section class="card mode-panel" id="panel-live" hidden aria-labelledby="liveHeading">
+    <h2 id="liveHeading" class="visually-hidden">Live webcam detection</h2>
+
+    <div class="live-stage">
+      <video id="liveVideo" autoplay muted playsinline hidden></video>
+      <img id="liveAnnotated" alt="Live annotated detection feed" hidden>
+      <div class="live-placeholder" id="livePlaceholder"><p>Camera feed will appear here</p></div>
+      <canvas id="liveCanvas" hidden></canvas>
+    </div>
+
+    <div class="card-footer">
+      <span class="hint" id="liveHint">Uses your webcam — nothing is sent anywhere except your local server</span>
+      <button class="run" id="liveToggleBtn" type="button">
+        <span id="liveToggleLabel">Start live detection</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===================== Error ===================== -->
+  <div class="error-box" id="errorBox" role="alert" hidden>
+    <strong>Couldn't reach the model server.</strong>
+    <div id="errorDetail"></div>
+  </div>
+
+  <!-- ===================== Results (image & video) ===================== -->
+  <section class="results" id="results" aria-live="polite" hidden>
+    <div class="result-image">
+      <p class="label" id="resultLabel">Detection output</p>
+      <img id="resultImg" alt="Annotated tray with detected packets">
+    </div>
+    <div class="tally">
+      <p class="label" id="tallyLabel">Total packets detected</p>
+      <p class="tally-count"><span id="countValue">0</span></p>
+      <div class="crate-grid" id="crateGrid" aria-hidden="true"></div>
+      <p class="tally-footnote" id="tallyFootnote">Each tile represents one packet, filled in order of detection confidence.</p>
+    </div>
+  </section>
+
+  <!-- ===================== Live results ===================== -->
+  <section class="results" id="liveResults" aria-live="polite" hidden>
+    <div class="result-image">
+      <p class="label">Live feed status</p>
+      <p class="live-stats">Latency: <span id="liveLatency">—</span> ms</p>
+    </div>
+    <div class="tally">
+      <p class="label">Packets in frame</p>
+      <p class="tally-count"><span id="liveCountValue">0</span></p>
+      <div class="crate-grid" id="liveCrateGrid" aria-hidden="true"></div>
+      <p class="tally-footnote">Updates continuously while live detection is running.</p>
+    </div>
+  </section>
+
+  <!-- ===================== Footer ===================== -->
+  <footer>
+    <span>Backend expected at <code id="apiUrlText"></code></span>
+    <span>CrateCount · local inference demo</span>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =======================================================
+     Config — change these to point at a different backend
+     ======================================================= */
+  const CONFIG = {
+    API_BASE_URL: 'http://localhost:8000',
+    WS_BASE_URL: 'ws://localhost:8000',
+
+    IMAGE_ENDPOINT: '/count/image',
+    VIDEO_ENDPOINT: '/count/video',
+    VIDEO_STATUS_ENDPOINT: '/count/video',
+    HEALTH_ENDPOINT: '/health',
+    LIVE_ENDPOINT: '/ws/live',
+
+    HEALTH_CHECK_INTERVAL_MS: 8000,
+    REQUEST_TIMEOUT_MS: 30000,
+    VIDEO_POLL_INTERVAL_MS: 1500,
+    LIVE_FRAME_INTERVAL_MS: 400,
+
+    CRATE_GRID: { MIN_SLOTS: 24, COLUMNS: 8, FILL_DELAY_MS: 20 },
+    COUNT_ANIMATION_STEP_MS: 25,
+  };
+
+  /* =======================================================
+     API layer
+     ======================================================= */
+  class ApiError extends Error {
+    constructor(message, { cause } = {}) {
+      super(message);
+      this.name = 'ApiError';
+      if (cause) this.cause = cause;
+    }
+  }
+
+  async function fetchWithTimeout(url, options = {}, timeoutMs = CONFIG.REQUEST_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new ApiError(`Request timed out after ${timeoutMs / 1000}s`, { cause: err });
+      }
+      throw new ApiError('Network request failed', { cause: err });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function isServerOnline() {
+    try {
+      const res = await fetchWithTimeout(`${CONFIG.API_BASE_URL}${CONFIG.HEALTH_ENDPOINT}`, { method: 'GET' }, 4000);
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function countImage(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetchWithTimeout(`${CONFIG.API_BASE_URL}${CONFIG.IMAGE_ENDPOINT}`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) throw new ApiError(`Server responded with ${response.status}`);
+
+    const data = await response.json();
+    if (typeof data.count !== 'number' || typeof data.image !== 'string') {
+      throw new ApiError('Server response was missing expected fields');
+    }
+    return data;
+  }
+
+  async function uploadVideo(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetchWithTimeout(
+      `${CONFIG.API_BASE_URL}${CONFIG.VIDEO_ENDPOINT}`,
+      { method: 'POST', body: formData },
+      120000
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new ApiError(body.detail || `Server responded with ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.job_id) throw new ApiError('Server did not return a job_id');
+    return data.job_id;
+  }
+
+  async function getVideoJobStatus(jobId) {
+    const response = await fetchWithTimeout(
+      `${CONFIG.API_BASE_URL}${CONFIG.VIDEO_STATUS_ENDPOINT}/${jobId}`,
+      { method: 'GET' },
+      10000
+    );
+    if (!response.ok) throw new ApiError(`Server responded with ${response.status}`);
+    return response.json();
+  }
+
+  async function waitForVideoJob(jobId, onProgress) {
+    while (true) {
+      const job = await getVideoJobStatus(jobId);
+      onProgress?.(job);
+
+      if (job.status === 'done') return job;
+      if (job.status === 'error') throw new ApiError(job.error || 'Video processing failed');
+
+      await new Promise((resolve) => setTimeout(resolve, CONFIG.VIDEO_POLL_INTERVAL_MS));
+    }
+  }
+
+  function connectLiveSocket({ onResult, onError, onClose }) {
+    const socket = new WebSocket(`${CONFIG.WS_BASE_URL}${CONFIG.LIVE_ENDPOINT}`);
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.error) onError?.(new ApiError(data.error));
+        else onResult?.(data);
+      } catch {
+        onError?.(new ApiError('Received malformed data from live socket'));
+      }
+    };
+    socket.onerror = (event) => onError?.(event);
+    socket.onclose = () => onClose?.();
+
+    return socket;
+  }
+
+  /* =======================================================
+     UI layer — all DOM references and render helpers
+     ======================================================= */
+  const el = {
+    tabs: document.querySelectorAll('.tab'),
+    panels: {
+      image: document.getElementById('panel-image'),
+      video: document.getElementById('panel-video'),
+      live: document.getElementById('panel-live'),
+    },
+
+    dropzone: document.getElementById('dropzone'),
+    fileInput: document.getElementById('fileInput'),
+    filenameTag: document.getElementById('filename'),
+    runBtn: document.getElementById('runBtn'),
+    runLabel: document.getElementById('runLabel'),
+    spinner: document.getElementById('spinner'),
+
+    videoDropzone: document.getElementById('videoDropzone'),
+    videoInput: document.getElementById('videoInput'),
+    videoFilenameTag: document.getElementById('videoFilename'),
+    videoRunBtn: document.getElementById('videoRunBtn'),
+    videoRunLabel: document.getElementById('videoRunLabel'),
+    videoSpinner: document.getElementById('videoSpinner'),
+    videoProgressTrack: document.getElementById('videoProgressTrack'),
+    videoProgressFill: document.getElementById('videoProgressFill'),
+    videoProgressLabel: document.getElementById('videoProgressLabel'),
+
+    liveVideo: document.getElementById('liveVideo'),
+    liveAnnotated: document.getElementById('liveAnnotated'),
+    livePlaceholder: document.getElementById('livePlaceholder'),
+    liveCanvas: document.getElementById('liveCanvas'),
+    liveToggleBtn: document.getElementById('liveToggleBtn'),
+    liveToggleLabel: document.getElementById('liveToggleLabel'),
+    liveHint: document.getElementById('liveHint'),
+    liveResults: document.getElementById('liveResults'),
+    liveCountValue: document.getElementById('liveCountValue'),
+    liveCrateGrid: document.getElementById('liveCrateGrid'),
+    liveLatency: document.getElementById('liveLatency'),
+
+    results: document.getElementById('results'),
+    resultImg: document.getElementById('resultImg'),
+    resultLabel: document.getElementById('resultLabel'),
+    countValue: document.getElementById('countValue'),
+    crateGrid: document.getElementById('crateGrid'),
+    tallyLabel: document.getElementById('tallyLabel'),
+    tallyFootnote: document.getElementById('tallyFootnote'),
+
+    errorBox: document.getElementById('errorBox'),
+    errorDetail: document.getElementById('errorDetail'),
+    statusDot: document.getElementById('statusDot'),
+    statusText: document.getElementById('statusText'),
+    apiUrlText: document.getElementById('apiUrlText'),
+  };
+
+  function setActiveMode(mode) {
+    el.tabs.forEach((tab) => {
+      const isActive = tab.dataset.mode === mode;
+      tab.classList.toggle('active', isActive);
+      tab.setAttribute('aria-selected', String(isActive));
+    });
+    Object.entries(el.panels).forEach(([key, panel]) => { panel.hidden = key !== mode; });
+
+    hideError();
+    el.results.hidden = true;
+    if (mode !== 'live') el.liveResults.hidden = true;
+  }
+
+  function renderApiUrl() {
+    el.apiUrlText.textContent = `${CONFIG.API_BASE_URL}${CONFIG.IMAGE_ENDPOINT}`;
+  }
+
+  function setServerStatus(online) {
+    el.statusDot.className = `status-dot ${online ? 'live' : 'down'}`;
+    el.statusText.textContent = online ? 'server online' : 'server offline';
+  }
+
+  function showError(message) {
+    el.errorDetail.textContent = message;
+    el.errorBox.hidden = false;
+  }
+  function hideError() { el.errorBox.hidden = true; }
+
+  function setDragOver(isOver) { el.dropzone.classList.toggle('dragover', isOver); }
+
+  function setSelectedImage(file) {
+    el.filenameTag.textContent = file.name;
+    el.filenameTag.hidden = false;
+    el.runBtn.disabled = false;
+    hideError();
+  }
+
+  function setImageLoading(isLoading) {
+    el.runBtn.disabled = isLoading;
+    el.spinner.classList.toggle('active', isLoading);
+    el.runLabel.textContent = isLoading ? 'Counting…' : 'Count packets';
+  }
+
+  function renderImageResult({ count, image }) {
+    el.resultLabel.textContent = 'Detection output';
+    el.tallyLabel.textContent = 'Total packets detected';
+    el.tallyFootnote.textContent = 'Each tile represents one packet, filled in order of detection confidence.';
+
+    el.resultImg.src = image;
+    el.results.hidden = false;
+
+    animateCount(el.countValue, count);
+    buildCrateGrid(el.crateGrid, count);
+
+    el.results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function setVideoDragOver(isOver) { el.videoDropzone.classList.toggle('dragover', isOver); }
+
+  function setSelectedVideo(file) {
+    el.videoFilenameTag.textContent = file.name;
+    el.videoFilenameTag.hidden = false;
+    el.videoRunBtn.disabled = false;
+    hideError();
+  }
+
+  function setVideoLoading(isLoading) {
+    el.videoRunBtn.disabled = isLoading;
+    el.videoSpinner.classList.toggle('active', isLoading);
+    el.videoRunLabel.textContent = isLoading ? 'Processing…' : 'Process video';
+    el.videoProgressTrack.hidden = !isLoading;
+    el.videoProgressLabel.hidden = !isLoading;
+    if (!isLoading) el.videoProgressFill.style.width = '0%';
+  }
+
+  function renderVideoProgress(job) {
+    const pct = Math.round((job.progress ?? 0) * 100);
+    el.videoProgressFill.style.width = `${pct}%`;
+    el.videoProgressLabel.textContent = `Processing video… ${pct}%`;
+  }
+
+  function renderVideoResult(job) {
+    el.resultLabel.textContent = 'Best detected frame';
+    el.tallyLabel.textContent = 'Peak packets detected';
+    el.tallyFootnote.textContent = `Average across sampled frames: ${job.average_count?.toFixed(1) ?? '—'}`;
+
+    el.resultImg.src = job.preview_image;
+    el.results.hidden = false;
+
+    animateCount(el.countValue, job.total_count ?? 0);
+    buildCrateGrid(el.crateGrid, job.total_count ?? 0);
+
+    el.results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function showLiveVideoStream(stream) {
+    el.liveVideo.srcObject = stream;
+    el.liveVideo.hidden = false;
+    el.liveAnnotated.hidden = true;
+    el.livePlaceholder.hidden = true;
+  }
+
+  function showLiveAnnotatedFrame(dataUrl) {
+    el.liveAnnotated.src = dataUrl;
+    el.liveAnnotated.hidden = false;
+    el.liveVideo.hidden = true;
+  }
+
+  function resetLiveStage() {
+    el.liveVideo.hidden = true;
+    el.liveAnnotated.hidden = true;
+    el.livePlaceholder.hidden = false;
+    el.liveResults.hidden = true;
+  }
+
+  function setLiveToggleState(isLive) {
+    el.liveToggleLabel.textContent = isLive ? 'Stop live detection' : 'Start live detection';
+    el.liveHint.textContent = isLive
+      ? 'Streaming frames to your local server…'
+      : 'Uses your webcam — nothing is sent anywhere except your local server';
+  }
+
+  function renderLiveResult({ count, latency_ms }) {
+    el.liveResults.hidden = false;
+    el.liveLatency.textContent = latency_ms;
+    el.liveCountValue.textContent = count;
+    buildCrateGrid(el.liveCrateGrid, count, false);
+  }
+
+  function animateCount(target, value) {
+    const stepSize = Math.max(1, Math.ceil(value / 30));
+    let current = 0;
+    const timer = setInterval(() => {
+      current = Math.min(current + stepSize, value);
+      target.textContent = current;
+      if (current >= value) clearInterval(timer);
+    }, CONFIG.COUNT_ANIMATION_STEP_MS);
+  }
+
+  function buildCrateGrid(gridEl, count, animate = true) {
+    const { MIN_SLOTS, COLUMNS, FILL_DELAY_MS } = CONFIG.CRATE_GRID;
+    gridEl.innerHTML = '';
+
+    const totalSlots = Math.max(MIN_SLOTS, Math.ceil(count / COLUMNS) * COLUMNS);
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < totalSlots; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      fragment.appendChild(slot);
+    }
+    gridEl.appendChild(fragment);
+
+    const slots = gridEl.querySelectorAll('.slot');
+    for (let i = 0; i < count && i < slots.length; i++) {
+      if (animate) setTimeout(() => slots[i].classList.add('filled'), i * FILL_DELAY_MS);
+      else slots[i].classList.add('filled');
+    }
+  }
+
+  /* =======================================================
+     App logic — wiring events to API + UI
+     ======================================================= */
+  let selectedImageFile = null;
+  let selectedVideoFile = null;
+
+  const liveSession = { stream: null, socket: null, intervalId: null, active: false };
+
+  async function refreshServerStatus() {
+    setServerStatus(await isServerOnline());
+  }
+
+  function initTabs() {
+    el.tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const mode = tab.dataset.mode;
+        setActiveMode(mode);
+        if (mode !== 'live' && liveSession.active) stopLiveDetection();
+      });
+    });
+  }
+
+  function handleImageSelected(file) {
+    if (!file.type.startsWith('image/')) {
+      showError("That file isn't an image. Please choose a JPG or PNG.");
+      return;
+    }
+    selectedImageFile = file;
+    setSelectedImage(file);
+  }
+
+  function initImageMode() {
+    el.fileInput.addEventListener('change', () => {
+      if (el.fileInput.files.length) handleImageSelected(el.fileInput.files[0]);
+    });
+
+    ['dragover', 'dragenter'].forEach((evt) =>
+      el.dropzone.addEventListener(evt, (e) => { e.preventDefault(); setDragOver(true); })
+    );
+    ['dragleave', 'drop'].forEach((evt) =>
+      el.dropzone.addEventListener(evt, (e) => { e.preventDefault(); setDragOver(false); })
+    );
+    el.dropzone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer?.files?.[0];
+      if (file) handleImageSelected(file);
+    });
+
+    el.runBtn.addEventListener('click', async () => {
+      if (!selectedImageFile) return;
+      setImageLoading(true);
+      hideError();
+      try {
+        const result = await countImage(selectedImageFile);
+        renderImageResult(result);
+      } catch (err) {
+        reportError(err, 'image');
+      } finally {
+        setImageLoading(false);
+      }
+    });
+  }
+
+  function handleVideoSelected(file) {
+    if (!file.type.startsWith('video/')) {
+      showError("That file isn't a video. Please choose an MP4, MOV, or WEBM.");
+      return;
+    }
+    selectedVideoFile = file;
+    setSelectedVideo(file);
+  }
+
+  function initVideoMode() {
+    el.videoInput.addEventListener('change', () => {
+      if (el.videoInput.files.length) handleVideoSelected(el.videoInput.files[0]);
+    });
+
+    ['dragover', 'dragenter'].forEach((evt) =>
+      el.videoDropzone.addEventListener(evt, (e) => { e.preventDefault(); setVideoDragOver(true); })
+    );
+    ['dragleave', 'drop'].forEach((evt) =>
+      el.videoDropzone.addEventListener(evt, (e) => { e.preventDefault(); setVideoDragOver(false); })
+    );
+    el.videoDropzone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer?.files?.[0];
+      if (file) handleVideoSelected(file);
+    });
+
+    el.videoRunBtn.addEventListener('click', async () => {
+      if (!selectedVideoFile) return;
+      setVideoLoading(true);
+      hideError();
+      try {
+        const jobId = await uploadVideo(selectedVideoFile);
+        const finishedJob = await waitForVideoJob(jobId, renderVideoProgress);
+        renderVideoResult(finishedJob);
+      } catch (err) {
+        reportError(err, 'video');
+      } finally {
+        setVideoLoading(false);
+      }
+    });
+  }
+
+  function initLiveMode() {
+    el.liveToggleBtn.addEventListener('click', () => {
+      if (liveSession.active) stopLiveDetection();
+      else startLiveDetection();
+    });
+  }
+
+  async function startLiveDetection() {
+    hideError();
+    try {
+      liveSession.stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    } catch {
+      showError('Could not access your webcam. Check browser permissions and try again.');
+      return;
+    }
+
+    showLiveVideoStream(liveSession.stream);
+
+    liveSession.socket = connectLiveSocket({
+      onResult: (result) => {
+        showLiveAnnotatedFrame(result.image);
+        renderLiveResult(result);
+      },
+      onError: (err) => reportError(err, 'live'),
+      onClose: () => { if (liveSession.active) stopLiveDetection(); },
+    });
+
+    liveSession.active = true;
+    setLiveToggleState(true);
+
+    const canvas = el.liveCanvas;
+    const ctx = canvas.getContext('2d');
+
+    liveSession.intervalId = setInterval(() => {
+      const video = el.liveVideo;
+      if (!video.videoWidth || liveSession.socket.readyState !== WebSocket.OPEN) return;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+
+      const frame = canvas.toDataURL('image/jpeg', 0.7);
+      liveSession.socket.send(frame);
+    }, CONFIG.LIVE_FRAME_INTERVAL_MS);
+  }
+
+  function stopLiveDetection() {
+    clearInterval(liveSession.intervalId);
+    liveSession.socket?.close();
+    liveSession.stream?.getTracks().forEach((track) => track.stop());
+
+    liveSession.stream = null;
+    liveSession.socket = null;
+    liveSession.intervalId = null;
+    liveSession.active = false;
+
+    setLiveToggleState(false);
+    resetLiveStage();
+  }
+
+  function reportError(err, context) {
+    const detail = err instanceof ApiError ? err.message : 'Something unexpected went wrong.';
+    const hint = context === 'live'
+      ? 'Live detection needs a stable connection to your local server.'
+      : 'Make sure the FastAPI server is running on port 8000.';
+    showError(`${detail} — ${hint}`);
+  }
+
+  function init() {
+    renderApiUrl();
+    initTabs();
+    initImageMode();
+    initVideoMode();
+    initLiveMode();
+
+    refreshServerStatus();
+    setInterval(refreshServerStatus, CONFIG.HEALTH_CHECK_INTERVAL_MS);
+  }
+
+  init();
+})();
+</script>
+
+</body>
+</html>

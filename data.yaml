@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['Milk-Packet']
+
+roboflow:
+  workspace: selvans-workspace-3h2sn
+  project: milk-packet-detection-dfjsv
+  version: 7
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/selvans-workspace-3h2sn/milk-packet-detection-dfjsv/dataset/7
